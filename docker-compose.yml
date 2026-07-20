@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  obsidian-bot:
+    build: .
+    container_name: obsidian-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./history.json:/root/history.json
+      - /root/obsidian-vault:/root/obsidian-vault
+      - /root/.ssh:/root/.ssh:ro

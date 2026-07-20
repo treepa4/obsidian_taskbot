@@ -1,0 +1,23 @@
+# Секреты и локальные конфиги
+.env
+
+# Локальная история пушей
+history.json
+
+# Бинарники Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+obsidian-bot
+
+# IDE
+.idea/
+.vscode/
+*.iws
+*.iml
+
+# Логи
+*.log
