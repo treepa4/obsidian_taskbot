@@ -12,7 +12,7 @@ history.json
 *.dylib
 bin/
 obsidian-bot
-
+bot
 # IDE
 .idea/
 .vscode/
@@ -21,3 +21,5 @@ obsidian-bot
 
 # Логи
 *.log
+
+test_board.md
