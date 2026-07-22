@@ -14,17 +14,17 @@ import (
 func main() {
 	_ = godotenv.Load()
 
-	telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	telegramToken := os.Getenv("BOT_TOKEN")
 	if telegramToken == "" {
 		log.Fatal("❌ Ошибка: TELEGRAM_BOT_TOKEN не задан в .env")
 	}
 
-	vaultPath := os.Getenv("OBSIDIAN_VAULT_PATH")
+	vaultPath := os.Getenv("VAULT_PATH")
 	if vaultPath == "" {
 		vaultPath = "/vault"
 	}
 
-	relBoardPath := os.Getenv("KANBAN_FILE_PATH")
+	relBoardPath := os.Getenv("BOARD_FILE")
 	if relBoardPath == "" {
 		relBoardPath = "заметки/Таски.md"
 	}
