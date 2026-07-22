@@ -5,9 +5,11 @@ services:
     build: .
     container_name: obsidian-bot
     restart: always
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     env_file:
       - .env
     volumes:
-      - ./history.json:/root/history.json
-      - /root/obsidian-vault:/root/obsidian-vault
-      - /root/.ssh:/root/.ssh:ro
+      - /root/obsidian-vault:/vault
+      - ~/.ssh:/root/.ssh:ro

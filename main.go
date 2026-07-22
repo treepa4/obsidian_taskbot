@@ -2,56 +2,56 @@ package main
 
 import (
 	"log"
-	"time"
+	"os"
+	"path/filepath"
 
-	"github.com/treepa4/obsidian_taskbot/internal/config"
+	"github.com/joho/godotenv"
 	"github.com/treepa4/obsidian_taskbot/internal/git"
-	"github.com/treepa4/obsidian_taskbot/internal/kanban"
 	"github.com/treepa4/obsidian_taskbot/internal/notifier"
 	"github.com/treepa4/obsidian_taskbot/internal/tg"
 )
 
 func main() {
-	log.Println("🚀 Запуск Obsidian Kanban Bot...")
+	_ = godotenv.Load()
 
-	cfg := config.Load()
-	if cfg.TelegramToken == "" {
-		log.Fatal("❌ Ошибка: BOT_TOKEN не задан в .env!")
+	telegramToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if telegramToken == "" {
+		log.Fatal("❌ Ошибка: TELEGRAM_BOT_TOKEN не задан в .env")
 	}
 
-	gitClient := git.New(cfg.VaultPath)
+	vaultPath := os.Getenv("OBSIDIAN_VAULT_PATH")
+	if vaultPath == "" {
+		vaultPath = "/vault"
+	}
 
-	tgBot, err := tg.New(cfg.TelegramToken, cfg.ChatID)
+	relBoardPath := os.Getenv("KANBAN_FILE_PATH")
+	if relBoardPath == "" {
+		relBoardPath = "заметки/Таски.md"
+	}
+
+	boardFilePath := filepath.Join(vaultPath, relBoardPath)
+
+	log.Printf("🚀 Запуск Obsidian TaskBot...")
+
+	git.PullVault(vaultPath)
+
+	bot, err := tg.New(telegramToken, 0)
 	if err != nil {
 		log.Fatalf("❌ Ошибка инициализации Telegram бота: %v", err)
 	}
 
-	notif := notifier.New("history.json")
-
 	gitPushFunc := func(commitMsg string) {
-		if err := gitClient.CommitAndPush(commitMsg); err != nil {
-			log.Printf("⚠️ Git push error: %v", err)
-		}
+		go func() {
+			if err := git.PushVault(vaultPath, commitMsg); err != nil {
+				log.Printf("⚠️ Ошибка Git Push: %v", err)
+			} else {
+				log.Printf("✅ Git push выполнен: %s", commitMsg)
+			}
+		}()
 	}
 
-	go tgBot.StartListener(cfg.BoardFilePath, gitPushFunc)
+	go notifier.StartScheduler(bot, boardFilePath, vaultPath)
 
-	log.Println("✅ Все сервисы инициализированы. Демон запущен!")
-
-	ticker := time.NewTicker(1 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		if err := gitClient.Pull(); err != nil {
-			log.Printf("⚠️ Git pull warning: %v", err)
-		}
-
-		tasks, err := kanban.ParseKanban(cfg.BoardFilePath)
-		if err != nil {
-			log.Printf("⚠️ Ошибка парсинга Kanban: %v", err)
-			continue
-		}
-
-		notif.Process(tgBot, tasks)
-	}
+	log.Println("🤖 Бот успешно запущен...")
+	bot.StartListener(boardFilePath, gitPushFunc)
 }
