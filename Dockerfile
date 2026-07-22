@@ -10,7 +10,7 @@ RUN go mod download
 COPY . .
 
 # Собираем бинарник
-RUN CGO_ENABLED=0 GOOS=linux go build -o obsidian-bot ./cmd/bot/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o obsidian-bot ./main.go
 
 # 2. Финальный образ
 FROM alpine:latest
