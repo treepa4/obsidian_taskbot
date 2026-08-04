@@ -14,6 +14,7 @@ type Task struct {
 	Priority bool
 	InWork   bool
 	IsDone   bool
+	Column   string
 	DoneDate string
 	Date     string
 	Time     string
@@ -30,10 +31,12 @@ var (
 )
 
 func ParseTaskLine(line string, column string) Task {
+	trimmed := strings.TrimSpace(line)
 	task := Task{
 		Priority: column == "СРОЧНО!!!",
 		InWork:   column == "В работе",
-		IsDone:   column == "Готово" || strings.HasPrefix(line, "- [x]"),
+		Column:   column,
+		IsDone:   column == "Готово" || strings.HasPrefix(trimmed, "- [x]"),
 	}
 
 	if strings.Contains(line, "🔺") {
@@ -56,7 +59,7 @@ func ParseTaskLine(line string, column string) Task {
 		task.DoneDate = match[1]
 	}
 
-	cleanText := strings.TrimPrefix(line, "- [ ]")
+	cleanText := strings.TrimPrefix(trimmed, "- [ ]")
 	cleanText = strings.TrimPrefix(cleanText, "- [x]")
 	cleanText = dateRegex.ReplaceAllString(cleanText, "")
 	cleanText = timeRegex.ReplaceAllString(cleanText, "")
@@ -88,26 +91,23 @@ func ParseKanban(filePath string) ([]Task, error) {
 			continue
 		}
 
-		if (!strings.HasPrefix(line, "- [ ]") && !strings.HasPrefix(line, "- [x]")) || currentColumn == "Готово" {
+		if line == "" || strings.HasPrefix(line, "%") || strings.HasPrefix(line, "---") || strings.HasPrefix(line, "**") {
 			continue
 		}
 
-		task := ParseTaskLine(line, currentColumn)
-		tasks = append(tasks, task)
+		if currentColumn == "Готово" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "- [ ]") || strings.HasPrefix(line, "- [x]") {
+			task := ParseTaskLine(line, currentColumn)
+			if !task.IsDone {
+				tasks = append(tasks, task)
+			}
+		}
 	}
 
 	return tasks, scanner.Err()
-}
-
-// matchTask проверяет, относится ли строка файла к переданному поисковому запросу (устойчиво к обрезке UTF-8)
-func matchTask(line string, taskText string) bool {
-	trimmedLine := strings.TrimSpace(line)
-	if !strings.HasPrefix(trimmedLine, "- [ ]") && !strings.HasPrefix(trimmedLine, "- [x]") {
-		return false
-	}
-
-	cleanSearch := strings.TrimRight(taskText, " ")
-	return strings.Contains(line, cleanSearch)
 }
 
 func DeleteTaskFromFile(filePath string, taskText string) error {
@@ -118,18 +118,20 @@ func DeleteTaskFromFile(filePath string, taskText string) error {
 
 	lines := strings.Split(string(input), "\n")
 	var newLines []string
-	found := false
+
+	cleanTarget := strings.ToLower(strings.TrimSpace(taskText))
+	cleanTarget = regexp.MustCompile(`[📅⏰🔺🏁✅]`).ReplaceAllString(cleanTarget, "")
+	cleanTarget = strings.Join(strings.Fields(cleanTarget), " ")
 
 	for _, line := range lines {
-		if matchTask(line, taskText) {
-			found = true
+		trimmed := strings.ToLower(strings.TrimSpace(line))
+		cleanLine := regexp.MustCompile(`[📅⏰🔺🏁✅]`).ReplaceAllString(trimmed, "")
+		cleanLine = strings.Join(strings.Fields(cleanLine), " ")
+
+		if cleanTarget != "" && strings.Contains(cleanLine, cleanTarget) {
 			continue
 		}
 		newLines = append(newLines, line)
-	}
-
-	if !found {
-		return fmt.Errorf("задача '%s' не найдена", taskText)
 	}
 
 	output := strings.Join(newLines, "\n")
@@ -186,8 +188,16 @@ func MoveTaskInFile(filePath string, taskText string, targetColumn string) error
 	var taskLine string
 	var newLines []string
 
+	cleanTarget := strings.ToLower(strings.TrimSpace(taskText))
+	cleanTarget = regexp.MustCompile(`[📅⏰🔺🏁✅]`).ReplaceAllString(cleanTarget, "")
+	cleanTarget = strings.Join(strings.Fields(cleanTarget), " ")
+
 	for _, line := range lines {
-		if matchTask(line, taskText) && taskLine == "" {
+		trimmed := strings.ToLower(strings.TrimSpace(line))
+		cleanLine := regexp.MustCompile(`[📅⏰🔺🏁✅]`).ReplaceAllString(trimmed, "")
+		cleanLine = strings.Join(strings.Fields(cleanLine), " ")
+
+		if taskLine == "" && cleanTarget != "" && strings.Contains(cleanLine, cleanTarget) {
 			taskLine = line
 			continue
 		}
@@ -195,12 +205,16 @@ func MoveTaskInFile(filePath string, taskText string, targetColumn string) error
 	}
 
 	if taskLine == "" {
-		return fmt.Errorf("задача '%s' не найдена", taskText)
+		return DeleteTaskFromFile(filePath, taskText)
 	}
 
 	if targetColumn == "Готово" {
 		if !strings.HasPrefix(strings.TrimSpace(taskLine), "- [x]") {
-			taskLine = strings.Replace(taskLine, "- [ ]", "- [x]", 1)
+			if strings.HasPrefix(strings.TrimSpace(taskLine), "- [ ]") {
+				taskLine = strings.Replace(taskLine, "- [ ]", "- [x]", 1)
+			} else {
+				taskLine = "- [x] " + strings.TrimPrefix(taskLine, "- ")
+			}
 		}
 		if !strings.Contains(taskLine, "✅") {
 			taskLine += fmt.Sprintf(" ✅ %s", time.Now().Format("2006-01-02"))
@@ -238,13 +252,20 @@ func TogglePriorityInFile(filePath string, taskText string) error {
 	var currentCol string
 	var newLines []string
 
+	cleanTarget := strings.ToLower(strings.TrimSpace(taskText))
+	cleanTarget = regexp.MustCompile(`[📅⏰🔺🏁✅]`).ReplaceAllString(cleanTarget, "")
+	cleanTarget = strings.Join(strings.Fields(cleanTarget), " ")
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "## ") {
 			currentCol = strings.TrimPrefix(trimmed, "## ")
 		}
 
-		if matchTask(line, taskText) && taskLine == "" {
+		cleanLine := regexp.MustCompile(`[📅⏰🔺🏁✅]`).ReplaceAllString(strings.ToLower(trimmed), "")
+		cleanLine = strings.Join(strings.Fields(cleanLine), " ")
+
+		if taskLine == "" && cleanTarget != "" && strings.Contains(cleanLine, cleanTarget) {
 			taskLine = line
 			continue
 		}
