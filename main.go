@@ -37,12 +37,12 @@ func loadConfig() Config {
 
 	vaultPath := os.Getenv("OBSIDIAN_VAULT_PATH")
 	if vaultPath == "" {
-		vaultPath = "./obsidian-vault"
+		vaultPath = "/vault"
 	}
 
 	boardFile := os.Getenv("KANBAN_BOARD_FILE")
 	if boardFile == "" {
-		boardFile = "Таски.md"
+		boardFile = "заметки/Таски.md"
 	}
 
 	return Config{
@@ -56,19 +56,16 @@ func loadConfig() Config {
 func main() {
 	cfg := loadConfig()
 
-	// 1. Инициализация Telegram бота
 	bot, err := tg.NewBot(cfg.TelegramToken, cfg.ChatID, cfg.VaultPath, cfg.BoardFile)
 	if err != nil {
 		log.Fatalf("Ошибка запуска бота: %v", err)
 	}
 	log.Println("🤖 Бот успешно запущен!")
 
-	// 2. Инициализация и запуск уведомлений (дайджестов)
 	n := notifier.NewNotifier(bot, cfg.VaultPath, cfg.BoardFile)
 	n.Start()
 	log.Println("⏰ Уведомления и дайджесты активированы (09:00 и 21:00 MSK)")
 
-	// 3. Обработка входящих сообщений и inline-кнопок
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -79,13 +76,11 @@ func main() {
 
 	updates := botAPI.GetUpdatesChan(u)
 
-	// Перехватываем системные сигналы для корректного завершения
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		for update := range updates {
-			// Обработка текстовых команд и добавления задач
 			if update.Message != nil {
 				if update.Message.Chat.ID != cfg.ChatID {
 					continue
@@ -96,34 +91,28 @@ func main() {
 
 				switch text {
 				case "/start", "/help":
-					bot.SendMessage("👋 Привет! Я твой Obsidian Kanban бот.\n\n" +
-						"🔹 Отправь любой текст — я добавлю его как задачу.\n" +
-						"🔹 /tasks — показать список активных задач.")
+					bot.SendHelpMenu()
 				case "/tasks", "/list":
 					bot.SendTasksList()
 				default:
-					// Парсим задачу из текста
 					task, obsidianLine := kanban.ParseNaturalLanguage(text)
 					targetCol := "Надо сделать"
 					if task.Priority {
 						targetCol = "СРОЧНО!!!"
 					}
 
-					// Записываем в файл Obsidian
 					err := kanban.AddTaskToFile(filePath, obsidianLine, targetCol)
 					if err != nil {
 						bot.SendMessage("❌ Ошибка при добавлении задачи: " + err.Error())
 						continue
 					}
 
-					// Синхронизация с Git
 					go git.SyncVault(cfg.VaultPath, "bot: add task '"+task.Text+"'")
-
 					bot.SendMessage("✅ Добавлено в *" + targetCol + "*: " + task.Text)
+					bot.SendTasksList()
 				}
 			}
 
-			// Обработка нажатий на inline-кнопки (done, del, prio, inwork, todo)
 			if update.CallbackQuery != nil {
 				cb := update.CallbackQuery
 				if cb.Message.Chat.ID != cfg.ChatID {
@@ -133,7 +122,6 @@ func main() {
 				data := cb.Data
 				filePath := filepath.Join(cfg.VaultPath, cfg.BoardFile)
 
-				// Подтверждаем получение callback
 				callbackCfg := tgbotapi.NewCallback(cb.ID, "")
 				botAPI.Request(callbackCfg)
 

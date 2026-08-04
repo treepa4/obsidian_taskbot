@@ -2,9 +2,7 @@ package tg
 
 import (
 	"fmt"
-	//"log"
 	"path/filepath"
-	//"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/treepa4/obsidian_taskbot/internal/kanban"
@@ -29,6 +27,24 @@ func NewBot(token string, chatID int64, vaultPath, boardFile string) (*Bot, erro
 		vaultPath: vaultPath,
 		boardFile: boardFile,
 	}, nil
+}
+
+// SendHelpMenu отправляет подробную инструкцию по командам и формату
+func (b *Bot) SendHelpMenu() {
+	text := "🤖 *Инструкция по работе с Obsidian TaskBot*\n\n" +
+		"📌 *Команды:*\n" +
+		"• `/tasks` или `/list` — Показать все текущие задачи\n" +
+		"• `/help` — Вызвать эту справку\n\n" +
+		"📝 *Добавление задач:*\n" +
+		"Просто напиши текст задачи в чат. Бот распознает форматы:\n" +
+		"• `Купить молоко сегодня в 18:00`\n" +
+		"• `Срочно сделать отчет завтра`\n" +
+		"• `Встреча в пятницу в 12:00`\n\n" +
+		"⏰ *Авто-дайджесты:*\n" +
+		"• ☀️ *09:00 MSK* — Утренний список задач\n" +
+		"• 🌙 *21:00 MSK* — Вечерние итоги дня"
+
+	b.SendMessage(text)
 }
 
 func (b *Bot) SendTasksList() {
@@ -60,9 +76,9 @@ func (b *Bot) SendTasksList() {
 		}
 	}
 
-	b.SendMessage("📋 *ТВОИ ЗАДАЧИ:*")
+	b.SendMessage("📋 *АКТУАЛЬНЫЙ СПИСОК ЗАДАЧ:*")
 
-	// 1. Срочные
+	// 1. Срочно
 	if len(urgentTasks) > 0 {
 		b.SendMessage("🚨 *СРОЧНО:*")
 		for _, task := range urgentTasks {
@@ -103,13 +119,9 @@ func (b *Bot) sendSingleTaskCard(task kanban.Task) {
 		text += fmt.Sprintf(" ⏰ %s", task.Time)
 	}
 
-	// Готовим кнопки управления
-	var keyboard tgbotapi.InlineKeyboardMarkup
-
-	// Ограничиваем длину текста задачи для callback_data
 	btnText := task.Text
-	if len(btnText) > 40 {
-		btnText = btnText[:40]
+	if len(btnText) > 35 {
+		btnText = btnText[:35]
 	}
 
 	inWorkBtn := tgbotapi.NewInlineKeyboardButtonData("⏩ В работу", "inwork:"+btnText)
@@ -117,7 +129,7 @@ func (b *Bot) sendSingleTaskCard(task kanban.Task) {
 		inWorkBtn = tgbotapi.NewInlineKeyboardButtonData("↩️ В надо сделать", "todo:"+btnText)
 	}
 
-	keyboard = tgbotapi.NewInlineKeyboardMarkup(
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✅ Выполнить", "done:"+btnText),
 			tgbotapi.NewInlineKeyboardButtonData("🗑 Удалить", "del:"+btnText),
