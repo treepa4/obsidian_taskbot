@@ -33,7 +33,7 @@ func NewBot(token string, chatID int64, vaultPath, boardFile string) (*Bot, erro
 func (b *Bot) SendHelpMenu() {
 	text := "🤖 *Инструкция по работе с Obsidian TaskBot*\n\n" +
 		"📌 *Команды:*\n" +
-		"• `/tasks` или `/list` — Показать все текущие задачи\n" +
+		"• `/tasks` или кнопка *📋 Мои задачи* — Показать все текущие задачи\n" +
 		"• `/help` — Вызвать эту справку\n\n" +
 		"📝 *Добавление задач:*\n" +
 		"Просто напиши текст задачи в чат. Бот распознает форматы:\n" +
@@ -44,7 +44,19 @@ func (b *Bot) SendHelpMenu() {
 		"• ☀️ *09:00 MSK* — Утренний список задач\n" +
 		"• 🌙 *21:00 MSK* — Вечерние итоги дня"
 
-	b.SendMessage(text)
+	// Создаем текстовые кнопки внизу экрана
+	replyKeyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("📋 Мои задачи"),
+			tgbotapi.NewKeyboardButton("❓ Помощь"),
+		),
+	)
+	replyKeyboard.ResizeKeyboard = true
+
+	msg := tgbotapi.NewMessage(b.chatID, text)
+	msg.ParseMode = "Markdown"
+	msg.ReplyMarkup = replyKeyboard
+	b.api.Send(msg)
 }
 
 func (b *Bot) SendTasksList() {

@@ -90,24 +90,30 @@ func main() {
 				filePath := filepath.Join(cfg.VaultPath, cfg.BoardFile)
 
 				switch text {
-				case "/start", "/help":
+				case "/start", "/help", "❓ Помощь":
 					bot.SendHelpMenu()
-				case "/tasks", "/list":
+
+				case "/tasks", "/list", "📋 Мои задачи", "Мои задачи", "Задачи":
 					bot.SendTasksList()
+
 				default:
+					// Парсим задачу из текста
 					task, obsidianLine := kanban.ParseNaturalLanguage(text)
 					targetCol := "Надо сделать"
 					if task.Priority {
 						targetCol = "СРОЧНО!!!"
 					}
 
+					// Записываем в файл Obsidian
 					err := kanban.AddTaskToFile(filePath, obsidianLine, targetCol)
 					if err != nil {
 						bot.SendMessage("❌ Ошибка при добавлении задачи: " + err.Error())
 						continue
 					}
 
+					// Синхронизация с Git
 					go git.SyncVault(cfg.VaultPath, "bot: add task '"+task.Text+"'")
+
 					bot.SendMessage("✅ Добавлено в *" + targetCol + "*: " + task.Text)
 					bot.SendTasksList()
 				}
